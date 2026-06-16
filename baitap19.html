@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài tập 19 - Memory Card Flip Game</title>
+    <style>
+        :root {
+            --bg-color: #ebf2f7; /* Màu nền xanh xám nhạt dịu mắt */
+            --primary-color: #ff7675; /* Màu cam hồng ấm áp cho nút bấm */
+            --card-front: linear-gradient(135deg, #74b9ff, #0984e3); /* Gradient xanh đại dương */
+            --card-back: #ffffff;
+            --text-main: #2d3436;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 25px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin-bottom: 12px;
+        }
+
+        .stats {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.6);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+
+        .stats span span {
+            color: #0984e3;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 118, 117, 0.25);
+            transition: all 0.2s ease;
+        }
+
+        button:hover {
+            background-color: #e84393;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        /* Khung Grid trò chơi */
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 cột trên điện thoại */
+            gap: 12px;
+            width: 100%;
+            max-width: 360px;
+            perspective: 1000px;
+        }
+
+        @media (min-width: 450px) {
+            .game-board {
+                grid-template-columns: repeat(4, 1fr); /* 4 cột trên màn hình rộng */
+                max-width: 480px;
+            }
+        }
+
+        /* Phong cách Thẻ bài */
+        .card {
+            width: 100%;
+            aspect-ratio: 1 / 1; /* Biến thẻ thành hình vuông cân đối */
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .card.flip {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            backface-visibility: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+
+        /* Mặt trước (Khi chưa lật) */
+        .card-front {
+            background: var(--card-front);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .card-front::after {
+            content: '✦'; /* Thay dấu '?' bằng ngôi sao lấp lánh hiện đại */
+            font-size: 1.5rem;
+        }
+
+        /* Mặt sau (Khi mở ra trái cây) */
+        .card-back {
+            background-color: var(--card-back);
+            transform: rotateY(180deg);
+            font-size: 2.2rem;
+        }
+
+        /* Thông báo chiến thắng */
+        #message {
+            margin-top: 20px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #2bcbba;
+            text-align: center;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Memory Match</h1>
+        <div class="stats">
+            <span>Lượt lật: <span id="moves">0</span></span>
+        </div>
+        <button onclick="resetGame()">Chơi Lại</button>
+    </header>
+
+    <main class="game-board" id="game-board"></main>
+
+    <div id="message"></div>
+
+    <script>
+        const board = document.getElementById('game-board');
+        const movesElement = document.getElementById('moves');
+        const messageElement = document.getElementById('message');
+
+        const items = ['🍎', '🍌', '🍇', '🍉'];
+        let cards = [...items, ...items]; 
+
+        let hasFlippedCard = false;
+        let lockBoard = false;
+        let firstCard, secondCard;
+        let moves = 0;
+        let matchedPairs = 0;
+
+        function initGame() {
+            cards.sort(() => 0.5 - Math.random());
+            board.innerHTML = '';
+            
+            cards.forEach((item) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.name = item;
+
+                card.innerHTML = `
+                    <div class="card-front"></div>
+                    <div class="card-back">${item}</div>
+                `;
+
+                card.addEventListener('click', flipCard);
+                board.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (lockBoard) return;
+            if (this === firstCard) return;
+
+            this.classList.add('flip');
+
+            if (!hasFlippedCard) {
+                hasFlippedCard = true;
+                firstCard = this;
+                return;
+            }
+
+            secondCard = this;
+            updateMoves();
+            checkForMatch();
+        }
+
+        function checkForMatch() {
+            let isMatch = firstCard.dataset.name === secondCard.dataset.name;
+
+            if (isMatch) {
+                disableCards();
+                matchedPairs++;
+                if (matchedPairs === items.length) {
+                    setTimeout(() => {
+                        messageElement.innerText = `Chúc mừng! Bạn đã thắng sau ${moves} lượt! 🎉`;
+                    }, 500);
+                }
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            firstCard.removeEventListener('click', flipCard);
+            secondCard.removeEventListener('click', flipCard);
+            resetBoard();
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            setTimeout(() => {
+                firstCard.classList.remove('flip');
+                secondCard.classList.remove('flip');
+                resetBoard();
+            }, 1000);
+        }
+
+        function resetBoard() {
+            [hasFlippedCard, lockBoard] = [false, false];
+            [firstCard, secondCard] = [null, null];
+        }
+
+        function updateMoves() {
+            moves++;
+            movesElement.innerText = moves;
+        }
+
+        function resetGame() {
+            moves = 0;
+            matchedPairs = 0;
+            movesElement.innerText = moves;
+            messageElement.innerText = '';
+            resetBoard();
+            initGame();
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
